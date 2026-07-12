@@ -3459,6 +3459,12 @@ curl $(terraform output -raw lb_health_probe_url)
 ```
 
 Connexion Grafana : 
+<img width="1905" height="866" alt="image" src="https://github.com/user-attachments/assets/ba39fb37-750a-4dcd-ae30-225b76b5a016" />
+<img width="1892" height="861" alt="image" src="https://github.com/user-attachments/assets/87978474-a93d-45a1-9d69-b99db0b4070a" />
+
+- Prometheus
+<img width="1917" height="787" alt="image" src="https://github.com/user-attachments/assets/4beb2fda-09e9-4050-820a-6190d0be5361" />
+<img width="1917" height="876" alt="image" src="https://github.com/user-attachments/assets/9eb7ba12-cc00-4691-bb2a-2cee7fbf8d52" />
 
 Connexion aux VMs : portail Azure -> Bastion -> sélectionner
 - `VM-SPOKE-1` : 
