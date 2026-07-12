@@ -2,6 +2,18 @@
 # Module compute — NIC + VM Linux réutilisable (app ou supervision)
 # ============================================================
 
+# IP publique optionnelle (ex : VM-MONITORING pour exposer Grafana/Prometheus
+# directement sur Internet, sans passer par le Load Balancer applicatif).
+resource "azurerm_public_ip" "this" {
+  count               = var.enable_public_ip ? 1 : 0
+  name                = "${var.vm_name}-pip"
+  location            = var.location
+  resource_group_name = var.rg_name
+  allocation_method   = var.public_ip_allocation_method
+  sku                 = "Standard"
+  tags                = var.tags
+}
+
 resource "azurerm_network_interface" "this" {
   name                = "${var.vm_name}-nic"
   location            = var.location
@@ -13,6 +25,7 @@ resource "azurerm_network_interface" "this" {
     subnet_id                     = var.subnet_id
     private_ip_address_allocation = var.private_ip_address != null ? "Static" : "Dynamic"
     private_ip_address            = var.private_ip_address
+    public_ip_address_id          = var.enable_public_ip ? azurerm_public_ip.this[0].id : null
   }
 }
 

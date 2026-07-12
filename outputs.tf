@@ -51,14 +51,19 @@ output "monitoring_vm_private_ip" {
   value       = module.vm_monitoring.private_ip
 }
 
+output "monitoring_vm_public_ip" {
+  description = "IP publique de la VM de supervision (Grafana/Prometheus, accès direct depuis Internet)"
+  value       = module.vm_monitoring.public_ip
+}
+
 output "grafana_url" {
   description = "URL Grafana (accessible depuis le CIDR défini par grafana_allowed_source)"
-  value       = "http://${module.vm_monitoring.private_ip}:3000"
+  value       = "http://${module.vm_monitoring.public_ip}:3000"
 }
 
 output "prometheus_url" {
   description = "URL Prometheus (accessible depuis le CIDR défini par grafana_allowed_source)"
-  value       = "http://${module.vm_monitoring.private_ip}:9090"
+  value       = "http://${module.vm_monitoring.public_ip}:9090"
 }
 
 # ----------------------------
@@ -75,6 +80,11 @@ output "bastion_public_ip" {
 # ----------------------------
 # Réseau
 # ----------------------------
+output "nat_gateway_public_ip" {
+  description = "IP publique utilisée par les VM1/VM2 (SubnetVM1/SubnetVM2) pour sortir vers Internet"
+  value       = module.network.nat_gateway_public_ip
+}
+
 output "hub_vnet_id" {
   value = module.network.hub_vnet_id
 }

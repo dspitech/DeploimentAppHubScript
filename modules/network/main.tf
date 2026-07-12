@@ -88,6 +88,49 @@ resource "azurerm_subnet" "spoke2_prod" {
   address_prefixes     = [var.spoke2_prod_prefix]
 }
 
+# ============================================================
+# NAT Gateway — accès sortant Internet pour les VMs applicatives
+# ------------------------------------------------------------
+# INDISPENSABLE : les VM1/VM2 sont attachées au pool backend d'un
+# Load Balancer Standard et n'ont pas d'IP publique propre. Un LB
+# Standard ne fournit AUCUNE sortie Internet implicite (contrairement
+# au SKU Basic) : sans NAT Gateway (ou règles outbound explicites sur
+# le LB), apt-get / curl / git clone / npm install / Supabase échouent
+# pendant le cloud-init, et l'application ne se déploie jamais.
+# ============================================================
+resource "azurerm_public_ip" "nat_pip" {
+  name                = "IP-NatGateway-AppSubnets"
+  location            = var.location
+  resource_group_name = var.rg_name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  tags                = var.tags
+}
+
+resource "azurerm_nat_gateway" "app_subnets" {
+  name                    = "NatGateway-AppSubnets"
+  location                = var.location
+  resource_group_name     = var.rg_name
+  sku_name                = "Standard"
+  idle_timeout_in_minutes = 10
+  tags                    = var.tags
+}
+
+resource "azurerm_nat_gateway_public_ip_association" "app_subnets" {
+  nat_gateway_id       = azurerm_nat_gateway.app_subnets.id
+  public_ip_address_id = azurerm_public_ip.nat_pip.id
+}
+
+resource "azurerm_subnet_nat_gateway_association" "vm1" {
+  subnet_id      = azurerm_subnet.hub_vm1.id
+  nat_gateway_id = azurerm_nat_gateway.app_subnets.id
+}
+
+resource "azurerm_subnet_nat_gateway_association" "vm2" {
+  subnet_id      = azurerm_subnet.hub_vm2.id
+  nat_gateway_id = azurerm_nat_gateway.app_subnets.id
+}
+
 # ----- Peerings Hub <-> Spokes -----
 resource "azurerm_virtual_network_peering" "hub_to_spoke1" {
   name                         = "HubToSpoke1"

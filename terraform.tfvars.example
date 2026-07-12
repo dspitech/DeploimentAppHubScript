@@ -52,7 +52,11 @@ database_url      = "postgresql://postgres:CHANGE-ME@db.CHANGE-ME.supabase.co:54
 # ----------------------------
 grafana_admin_user     = "admin"
 grafana_admin_password = "CHANGE-ME"
-grafana_allowed_source = "10.0.0.0/16" # ajoutez votre IP publique en /32 si besoin d'accès direct
+# La VM de supervision a désormais une IP publique dédiée (enable_public_ip = true
+# dans main.tf). Par sécurité, grafana_allowed_source reste restreint par défaut :
+# remplacez par VOTRE IP publique en /32 (ex : "203.0.113.42/32") pour y accéder
+# depuis Internet, ou "Internet" (déconseillé, tout Internet pourra s'y connecter).
+grafana_allowed_source = "10.0.0.0/16" # ex: "203.0.113.42/32" pour votre IP publique, ou "Internet"
 
 # ----------------------------
 # Tags

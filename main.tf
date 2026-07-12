@@ -324,4 +324,9 @@ module "vm_monitoring" {
   ssh_public_key_path = var.ssh_public_key_path
   vm_image            = var.vm_image
   custom_data_base64  = base64encode(local.monitoring_cloud_init)
+
+  # IP publique dédiée : indispensable pour accéder à Grafana/Prometheus
+  # directement depuis Internet (voir grafana_allowed_source ci-dessous
+  # pour restreindre QUI peut s'y connecter).
+  enable_public_ip = true
 }

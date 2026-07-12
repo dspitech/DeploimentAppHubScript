@@ -71,3 +71,15 @@ variable "private_ip_address" {
   type        = string
   default     = null
 }
+
+variable "enable_public_ip" {
+  description = "Si true, crée une IP publique Standard et l'attache à la NIC de la VM (utilisé pour la VM de supervision Grafana/Prometheus)."
+  type        = bool
+  default     = false
+}
+
+variable "public_ip_allocation_method" {
+  description = "Méthode d'allocation de l'IP publique (Standard SKU => Static requis)."
+  type        = string
+  default     = "Static"
+}
