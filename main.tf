@@ -38,22 +38,19 @@ module "network" {
 }
 
 # ============================================================
-# Firewall + routage inter-spoke
+# Firewall — RETIRÉ
+# ------------------------------------------------------------
+# Le firewall ne routait que le trafic inter-spoke (ICMP Spoke1<->Spoke2),
+# or les VM1/VM2 sont en réalité hébergées dans VnetHub (SubnetVM1/SubnetVM2,
+# contrainte du Load Balancer Standard) et non dans les VNets Spoke1/Spoke2.
+# Les routes UDR ciblaient donc des subnets Spoke vides, sans VM dessus :
+# ce module ne servait à rien fonctionnellement, tout en consommant une
+# IP publique. Retiré pour respecter le quota de 3 IP publiques de la
+# subscription (LB + Bastion + VM-MONITORING).
+# Le code du module reste disponible dans modules/firewall/ si vous
+# voulez le réactiver plus tard (ex : upgrade de quota, ou VMs réellement
+# déplacées dans les VNets Spoke).
 # ============================================================
-module "firewall" {
-  source = "./modules/firewall"
-
-  name     = var.firewall_name
-  location = azurerm_resource_group.rg.location
-  rg_name  = azurerm_resource_group.rg.name
-  tags     = var.tags
-
-  firewall_subnet_id    = module.network.firewall_subnet_id
-  spoke1_prod_prefix    = var.spoke1_prod_prefix
-  spoke2_prod_prefix    = var.spoke2_prod_prefix
-  spoke1_prod_subnet_id = module.network.spoke1_prod_subnet_id
-  spoke2_prod_subnet_id = module.network.spoke2_prod_subnet_id
-}
 
 # ============================================================
 # Bastion (accès admin sécurisé, sans IP publique sur les VMs)

@@ -22,15 +22,8 @@ output "lb_health_probe_url" {
 }
 
 # ----------------------------
-# Firewall
+# Firewall — module retiré (voir commentaire dans main.tf)
 # ----------------------------
-output "firewall_public_ip" {
-  value = module.firewall.public_ip
-}
-
-output "firewall_private_ip" {
-  value = module.firewall.private_ip
-}
 
 # ----------------------------
 # VMs applicatives
@@ -80,11 +73,6 @@ output "bastion_public_ip" {
 # ----------------------------
 # Réseau
 # ----------------------------
-output "nat_gateway_public_ip" {
-  description = "IP publique utilisée par les VM1/VM2 (SubnetVM1/SubnetVM2) pour sortir vers Internet"
-  value       = module.network.nat_gateway_public_ip
-}
-
 output "hub_vnet_id" {
   value = module.network.hub_vnet_id
 }

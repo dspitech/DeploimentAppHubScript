@@ -64,3 +64,27 @@ resource "azurerm_lb_rule" "lb_rule_https" {
   enable_floating_ip             = false
   idle_timeout_in_minutes        = 4
 }
+
+# ============================================================
+# Règle outbound — accès sortant Internet pour les VM1/VM2
+# ------------------------------------------------------------
+# Un Load Balancer Standard ne fournit AUCUNE sortie Internet implicite
+# aux VMs de son backend pool (contrairement au SKU Basic). Sans cette
+# règle (ou une NAT Gateway dédiée), apt-get / curl / git clone / npm
+# install / Supabase échoueraient pendant le cloud-init des VM1/VM2.
+# On réutilise ici l'IP publique déjà créée pour le LB (frontend HTTP/S)
+# plutôt qu'une NAT Gateway séparée, pour rester dans le quota de 3 IP
+# publiques de la subscription.
+# ============================================================
+resource "azurerm_lb_outbound_rule" "app_outbound" {
+  name                    = "OutboundToInternet"
+  loadbalancer_id         = azurerm_lb.this.id
+  protocol                = "All"
+  backend_address_pool_id = azurerm_lb_backend_address_pool.backend_pool.id
+  allocated_outbound_ports = 10000
+  idle_timeout_in_minutes  = 4
+
+  frontend_ip_configuration {
+    name = "FrontEnd"
+  }
+}
