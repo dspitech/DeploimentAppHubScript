@@ -3331,14 +3331,30 @@ justification :
 | Une paire de clés SSH | `ls ~/.ssh` | `ssh-keygen -t rsa -b 4096 -f ~/.ssh/hubspoke_rsa` |
 
 
+- Se conencter à Azure
+<img width="1912" height="822" alt="image" src="https://github.com/user-attachments/assets/fd691a76-2f2f-4f1f-9393-cb1c6ea9a7f4" />
+
+- Récupérer le projet
+<img width="1401" height="400" alt="image" src="https://github.com/user-attachments/assets/4b84e0c0-8cc8-45a4-a5c6-a03ea9a2fde2" />
+<img width="1636" height="342" alt="image" src="https://github.com/user-attachments/assets/74847ba9-7272-40cf-a383-9576d73d1da0" />
+
+
 
 #### 15.2 Récupérer les clés (voir détail section 16)
 
 1. Clé SSH : `ssh-keygen -t rsa -b 4096 -f ~/.ssh/hubspoke_rsa -C "admin-hubspoke"`
+<img width="1744" height="667" alt="image" src="https://github.com/user-attachments/assets/ae84c810-de92-4225-9fbc-611adb8197b6" />
+
 2. Identifiants Supabase : Project Settings -> Data API (URL + clé anon) et
    Database -> Connection string (URI)
 3. GitHub PAT : Settings -> Developer settings -> Personal access tokens
    (classic) -> scopes `repo` + `workflow`
+
+<img width="1912" height="842" alt="image" src="https://github.com/user-attachments/assets/94dd2e33-d01d-42cf-ad74-cef0bebc91bf" />
+<img width="1555" height="314" alt="image" src="https://github.com/user-attachments/assets/c0bee20f-428b-4dfa-a908-b3e2468f7f2f" />
+
+
+
 4. Mot de passe admin Grafana : à choisir
 
 
@@ -3348,7 +3364,10 @@ justification :
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Éditez `terraform.tfvars` (valeurs non sensibles uniquement) :
+<img width="1692" height="441" alt="image" src="https://github.com/user-attachments/assets/d7da2afd-f913-475e-b92a-095529a13f7d" />
+
+
+Éditez `terraform.tfvars` avce les vraies valeurs du projet :
 
 ```hcl
 ssh_public_key_path    = "~/.ssh/hubspoke_rsa.pub"
@@ -3368,11 +3387,15 @@ export TF_VAR_github_pat="ghp_xxxxxxxxxxxxxxxxxxxx"
 export TF_VAR_grafana_admin_password="UnMotDePasseTresFort123!"
 ```
 
+<img width="1868" height="697" alt="image" src="https://github.com/user-attachments/assets/c0ecaaa0-3bf4-4177-b282-40c83c32ec3e" />
+
+
 #### 15.5 Déployer
 
 ```bash
 terraform init && terraform fmt && terraform validate && terraform plan && terraform apply -auto-approve
 ```
+<img width="1926" height="792" alt="image" src="https://github.com/user-attachments/assets/83f66e36-44b7-41d5-b680-3f940e80a5ae" />
 
 Durée : 10 à 20 minutes (création réseau/firewall/bastion/VMs puis exécution
 complète des cloud-init).
