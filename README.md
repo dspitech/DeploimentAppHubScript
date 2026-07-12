@@ -3400,6 +3400,19 @@ terraform init && terraform fmt && terraform validate && terraform plan && terra
 Durée : 10 à 20 minutes (création réseau/firewall/bastion/VMs puis exécution
 complète des cloud-init).
 
+<img width="1880" height="822" alt="image" src="https://github.com/user-attachments/assets/4c98f266-de4d-4685-817c-3ac6e982ca46" />
+<img width="1857" height="806" alt="image" src="https://github.com/user-attachments/assets/e7d24c7e-aa6d-429f-9079-2858371f700b" />
+<img width="1796" height="146" alt="image" src="https://github.com/user-attachments/assets/2185f02c-5bcb-4c78-918d-f7331e2ec1b0" />
+
+- Load-Balancer
+<img width="1917" height="817" alt="image" src="https://github.com/user-attachments/assets/f21f1f63-1c0d-4462-8d41-d6f8cc085c33" />
+<img width="1892" height="827" alt="image" src="https://github.com/user-attachments/assets/d87ee049-bac0-4426-a144-5b1169cb677b" />
+
+- Trois VMs
+<img width="1917" height="520" alt="image" src="https://github.com/user-attachments/assets/7b424f89-e304-417c-8618-13406649fc1f" />
+
+
+
 #### 15.6 Activer le CI/CD dans le dépôt applicatif
 
 les trois dossiers à copier au niveau du code de l'application : 
