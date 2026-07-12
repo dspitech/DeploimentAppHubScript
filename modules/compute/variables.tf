@@ -60,6 +60,12 @@ variable "backend_pool_id" {
   default     = null
 }
 
+variable "attach_to_lb" {
+  description = "Doit être true/false littéral (connu au plan) : indique si cette VM doit être attachée au backend pool du Load Balancer. Ne PAS déduire cette valeur de backend_pool_id != null, car l'ID d'un backend pool nouvellement créé n'est connu qu'après apply, ce qui ferait échouer 'count' au moment du plan."
+  type        = bool
+  default     = false
+}
+
 variable "private_ip_address" {
   description = "IP privée statique (optionnel, sinon Dynamic)"
   type        = string
