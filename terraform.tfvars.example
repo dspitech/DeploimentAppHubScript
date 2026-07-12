@@ -1,14 +1,6 @@
 # ============================================================
 # PLG - 2026 / Groupe 24 : ESTIAM - Paris
 # terraform.tfvars.example
-# ------------------------------------------------------------
-# Copiez ce fichier en "terraform.tfvars" (jamais commité, voir .gitignore)
-# et remplacez les valeurs sensibles.
-#
-# NE JAMAIS committer terraform.tfvars, ni le fichier .env local,
-# ni un secret dans un message/README. Préférez, pour un vrai
-# environnement de prod, Azure Key Vault + une lecture via
-# data "azurerm_key_vault_secret" plutôt que des variables en clair.
 # ============================================================
 
 # ----------------------------
@@ -21,42 +13,31 @@ location = "norwayeast"
 # Authentification VMs
 # ----------------------------
 admin_username      = "scripttools_plgEstiam"
-ssh_public_key_path = "~/clouddrive/hubspoke_rsa.pub"
+ssh_public_key_path = "/home/azure-4clazur/.ssh/hubspoke_rsa.pub"
 
 # ----------------------------
 # Application / GitHub
 # ----------------------------
-github_repo_url = "https://github.com/dspitech/azure-script-hub-fa365d79.git"
-repo_name       = "azure-script-hub-fa365d79"
+github_repo_url = "https://github.com/dspitech/plg-projet-pedagogique-2026-groupe-24.git"
+repo_name       = "plg-projet-pedagogique-2026-groupe-24"
 github_owner    = "dspitech"
-
-# GitHub PAT (scope repo + workflow), utilisé une seule fois au boot de la VM
-# pour enregistrer le runner auto-hébergé. A fournir de préférence via :
-#   export TF_VAR_github_pat="ghp_xxxxxxxxxxxx"
-github_pat = "CHANGE-ME"
+github_pat      = ""
 
 # ----------------------------
 # Supabase (SECRETS — à ne jamais committer avec de vraies valeurs)
-# Astuce : définissez-les plutôt via variables d'environnement :
-#   export TF_VAR_supabase_url="https://xxxx.supabase.co"
-#   export TF_VAR_supabase_anon_key="sb_publishable_xxx"
-#   export TF_VAR_database_url="postgresql://postgres:xxx@db.xxxx.supabase.co:5432/postgres"
 # ----------------------------
-supabase_url      = "https://CHANGE-ME.supabase.co"
-supabase_anon_key = "CHANGE-ME"
-database_url      = "postgresql://postgres:CHANGE-ME@db.CHANGE-ME.supabase.co:5432/postgres"
+supabase_url      = ""
+supabase_anon_key = ""
+database_url      = ""
+
 
 # ----------------------------
 # Supervision (Grafana admin password — SECRET)
-#   export TF_VAR_grafana_admin_password="un-mot-de-passe-fort"
 # ----------------------------
 grafana_admin_user     = "admin"
-grafana_admin_password = "CHANGE-ME"
-# La VM de supervision a désormais une IP publique dédiée (enable_public_ip = true
-# dans main.tf). Par sécurité, grafana_allowed_source reste restreint par défaut :
-# remplacez par VOTRE IP publique en /32 (ex : "203.0.113.42/32") pour y accéder
-# depuis Internet, ou "Internet" (déconseillé, tout Internet pourra s'y connecter).
-grafana_allowed_source = "10.0.0.0/16" # ex: "203.0.113.42/32" pour votre IP publique, ou "Internet"
+grafana_admin_password = "Dspi@1996@Estiam12"
+grafana_allowed_source = "81.220.68.129/32" # ajoutez votre IP publique en /32 si besoin d'accès direct
+monitoring_vm_size = "Standard_D2s_v3"
 
 # ----------------------------
 # Tags

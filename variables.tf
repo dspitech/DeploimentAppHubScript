@@ -212,13 +212,13 @@ variable "firewall_name" {
 variable "github_repo_url" {
   description = "URL HTTPS du dépôt GitHub de l'application"
   type        = string
-  default     = "https://github.com/dspitech/azure-script-hub-fa365d79.git"
+  default     = "https://github.com/dspitech/plg-projet-pedagogique-2026-groupe-24.git"
 }
 
 variable "repo_name" {
   description = "Nom du dossier local du dépôt cloné"
   type        = string
-  default     = "azure-script-hub-fa365d79"
+  default     = "plg-projet-pedagogique-2026-groupe-24"
 }
 
 variable "supabase_url" {

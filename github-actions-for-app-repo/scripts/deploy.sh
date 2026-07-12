@@ -2,8 +2,6 @@
 # ============================================================
 # PLG - 2026 / Groupe 24 : ESTIAM - Paris
 # scripts/deploy.sh
-# À copier dans le dépôt de l'application (azure-script-hub-fa365d79)
-# Exécuté par le runner GitHub Actions auto-hébergé sur chaque VM.
 # ============================================================
 set -euo pipefail
 

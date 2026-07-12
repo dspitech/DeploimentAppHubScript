@@ -1,4 +1,4 @@
-# Rapport de projet -Rendu n°07
+# Projet pédagogique 2026 ESTIAM Paris : Rendu n°07
 
 ![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.2-844FBA?logo=terraform&logoColor=white)
 ![Azure](https://img.shields.io/badge/Cloud-Microsoft%20Azure-0089D6?logo=microsoftazure&logoColor=white)
@@ -749,13 +749,13 @@ variable "firewall_name" {
 variable "github_repo_url" {
   description = "URL HTTPS du dépôt GitHub de l'application"
   type        = string
-  default     = "https://github.com/dspitech/azure-script-hub-fa365d79.git"
+  default     = "https://github.com/dspitech/plg-projet-pedagogique-2026-groupe-24.git"
 }
 
 variable "repo_name" {
   description = "Nom du dossier local du dépôt cloné"
   type        = string
-  default     = "azure-script-hub-fa365d79"
+  default     = "plg-projet-pedagogique-2026-groupe-24"
 }
 
 variable "supabase_url" {
@@ -1317,8 +1317,8 @@ ssh_public_key_path = "~/clouddrive/hubspoke_rsa.pub"
 # ----------------------------
 # Application / GitHub
 # ----------------------------
-github_repo_url = "https://github.com/dspitech/azure-script-hub-fa365d79.git"
-repo_name       = "azure-script-hub-fa365d79"
+github_repo_url = "https://github.com/dspitech/plg-projet-pedagogique-2026-groupe-24.git"
+repo_name       = "plg-projet-pedagogique-2026-groupe-24"
 github_owner    = "dspitech"
 
 # GitHub PAT (scope repo + workflow), utilisé une seule fois au boot de la VM
@@ -3146,8 +3146,8 @@ chargé automatiquement grâce au provider défini dans `dashboards.yml`
 
 Ces deux fichiers ne vivent pas dans ce dépôt Terraform : ils sont préparés
 dans `github-actions-for-app-repo/` pour être **copiés dans le dépôt de
-l'application** (`azure-script-hub-fa365d79`), puisque c'est ce dépôt qui
-doit déclencher le déploiement à chaque `push`.
+l'application** (`plg-projet-pedagogique-2026-groupe-24`), puisque c'est ce
+dépôt qui doit déclencher le déploiement à chaque `push`.
 
 #### 13.1 `.github/workflows/deploy.yml`
 
@@ -3155,7 +3155,7 @@ doit déclencher le déploiement à chaque `push`.
 # ============================================================
 # PLG - 2026 / Groupe 24 : ESTIAM - Paris
 # .github/workflows/deploy.yml
-# À copier dans le dépôt de l'application (azure-script-hub-fa365d79)
+# À copier dans le dépôt de l'application (plg-projet-pedagogique-2026-groupe-24)
 #
 # Fonctionnement :
 # - Déclenché à chaque push sur "main"
@@ -3236,7 +3236,9 @@ disponible sur l'ancienne version.
 #!/usr/bin/env bash
 # ============================================================
 # PLG - 2026 / Groupe 24 : ESTIAM - Paris
-# scripts/deploy.sh dans le dépôt de l'applicationdans le dépôt de l'application
+# scripts/deploy.sh
+# À copier dans le dépôt de l'application (plg-projet-pedagogique-2026-groupe-24)
+# Exécuté par le runner GitHub Actions auto-hébergé sur chaque VM.
 # ============================================================
 set -euo pipefail
 
@@ -3296,6 +3298,73 @@ fichier `.sh` dédié permet de le tester manuellement en SSH (via Bastion)
 sans avoir à déclencher tout le pipeline GitHub Actions, et de le réutiliser
 si un jour un autre déclencheur (webhook, cron) devait appeler le même
 déploiement.
+
+---
+
+#### 13.3 Dépannage : vérifier et relancer le runner auto-hébergé
+
+Le cloud-init (section 11.1) installe et démarre déjà le runner comme
+**service systemd** dès le premier boot de chaque VM (`svc.sh install` +
+`svc.sh start`), donc en fonctionnement normal aucune action manuelle n'est
+nécessaire après un simple `git push`. Ce run-book sert uniquement en cas de
+run bloqué en `queued` (ex : VM redémarrée, service arrêté, token de
+runner expiré) et reprend les vérifications à faire, dans l'ordre.
+
+**1. Constater le problème -depuis un poste local ou Cloud Shell (`gh` CLI
+authentifié)**
+
+```bash
+gh run list --repo dspitech/plg-projet-pedagogique-2026-groupe-24 --workflow=deploy.yml
+```
+
+Un run resté en `queued` plus de quelques secondes indique qu'aucun runner
+disponible n'a pris le job -c'est le symptôme, pas la cause.
+
+**2. Vérifier que les runners sont bien enregistrés côté GitHub -depuis
+Cloud Shell**
+
+```bash
+gh api repos/dspitech/plg-projet-pedagogique-2026-groupe-24/actions/runners
+```
+
+Regarder le champ `status` de chaque runner (`vm-spoke-1` / `vm-spoke-2`) :
+`online` = le service tourne et le runner communique avec GitHub ;
+`offline` = le service est arrêté ou la VM ne peut plus joindre GitHub.
+
+**3. Si un runner est `offline` -se connecter à la VM concernée (Bastion)
+et relancer le service**
+
+```bash
+cd ~/actions-runner
+sudo ./svc.sh install
+sudo ./svc.sh start
+sudo systemctl status actions.runner.*.service
+```
+
+- `svc.sh install` : (ré)installe le service systemd (sans effet si déjà
+  installé -commande idempotente, utile si le service avait été désinstallé
+  ou n'existait pas encore).
+- `svc.sh start` : démarre (ou redémarre) le service.
+- `systemctl status actions.runner.*.service` : confirme l'état `active
+  (running)` et affiche les derniers logs en cas d'échec persistant.
+
+**4. Rejouer le déploiement sans nouveau commit**
+
+Une fois le runner repassé `online` (vérifiable à nouveau avec la commande
+de l'étape 2), redéclencher le workflow sans pousser de code :
+
+```bash
+gh workflow run deploy.yml --repo dspitech/plg-projet-pedagogique-2026-groupe-24
+```
+
+**Pourquoi ce n'est pas (encore) 100% automatique** : `svc.sh` configure le
+service pour démarrer au boot de la VM, mais ne le supervise pas au-delà
+(pas de politique de redémarrage automatique en cas de crash du process, ni
+de re-registration automatique si le token expire). Une amélioration
+possible serait d'ajouter `Restart=always` à l'unit systemd générée par le
+runner, ou une vérification périodique (cron/health-check) qui relance
+`svc.sh start` si le service n'est pas `active` -non implémenté à ce stade
+du projet.
 
 ---
 
@@ -3372,8 +3441,8 @@ cp terraform.tfvars.example terraform.tfvars
 ```hcl
 ssh_public_key_path    = "~/.ssh/hubspoke_rsa.pub"
 supabase_url           = "https://xxxx.supabase.co"
-github_repo_url        = "https://github.com/dspitech/azure-script-hub-fa365d79.git"
-repo_name              = "azure-script-hub-fa365d79"
+github_repo_url        = "https://github.com/dspitech/plg-projet-pedagogique-2026-groupe-24.git"
+repo_name              = "plg-projet-pedagogique-2026-groupe-24"
 github_owner           = "dspitech"
 grafana_allowed_source = "10.0.0.0/16"
 ```
@@ -3415,7 +3484,7 @@ complète des cloud-init).
 
 #### 15.6 Activer le CI/CD dans le dépôt applicatif
 
-les trois dossiers à copier au niveau du code de l'application : 
+les deux dossiers à copier au niveau du code de l'application : 
 
 
 ```bash
