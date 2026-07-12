@@ -321,8 +321,7 @@ azure-script-hub/
 ## Tâche 2 : Hébergement et déploiement automatisé avec Terraform & supervision du site web dans Azure
 
 
-| | |
-|---|---|
+
 | **Stack** | Terraform · Azure (VNet, Firewall, Bastion, Load Balancer, VM) · Node.js · Nginx · PM2 · Docker · Prometheus · Grafana · GitHub Actions |
 
 ---
