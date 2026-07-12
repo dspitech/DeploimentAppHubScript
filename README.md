@@ -6,7 +6,7 @@
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
 ![Status](https://img.shields.io/badge/Statut-Rendu%2007-success)
 
-## Informations du projet
+## Informations du projet 
  
 | Élément | Détails |
 |---|---|
@@ -40,7 +40,7 @@
 Ce document constitue le **rapport du rendu n°07** du projet **Cloud Script
 Manager**. Il couvre les deux tâches réalisées sur cette itération :
 
-1. **Réorganisation des dossiers et fichiers du code du site web** —
+1. **Réorganisation des dossiers et fichiers du code du site web** -
    restructuration de l'arborescence `src/pages` en modules fonctionnels
    cohérents (feature-based), sans régression sur les routes, les imports
    ou le build TypeScript.
@@ -2732,7 +2732,7 @@ du `terraform apply`, sans étape manuelle oubliable, et le processus est
 CI/CD** : les VMs applicatives n'ayant pas d'IP publique (SSH uniquement via
 Bastion), un système CI/CD classique (connexion SSH depuis GitHub) n'est pas
 possible sans exposer un port. Le runner auto-hébergé résout ce problème en
-**allant chercher le travail sur GitHub** (connexion sortante uniquement) —
+**allant chercher le travail sur GitHub** (connexion sortante uniquement) -
 aucune ouverture de port entrant n'est nécessaire.
 
 ---
