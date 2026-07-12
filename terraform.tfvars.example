@@ -1,0 +1,65 @@
+# ============================================================
+# PLG - 2026 / Groupe 24 : ESTIAM - Paris
+# terraform.tfvars.example
+# ------------------------------------------------------------
+# Copiez ce fichier en "terraform.tfvars" (jamais commité, voir .gitignore)
+# et remplacez les valeurs sensibles.
+#
+# NE JAMAIS committer terraform.tfvars, ni le fichier .env local,
+# ni un secret dans un message/README. Préférez, pour un vrai
+# environnement de prod, Azure Key Vault + une lecture via
+# data "azurerm_key_vault_secret" plutôt que des variables en clair.
+# ============================================================
+
+# ----------------------------
+# Général
+# ----------------------------
+rg_name  = "RG-PLG-ESTIAM-Paris-2026"
+location = "norwayeast"
+
+# ----------------------------
+# Authentification VMs
+# ----------------------------
+admin_username      = "scripttools_plgEstiam"
+ssh_public_key_path = "~/clouddrive/hubspoke_rsa.pub"
+
+# ----------------------------
+# Application / GitHub
+# ----------------------------
+github_repo_url = "https://github.com/dspitech/azure-script-hub-fa365d79.git"
+repo_name       = "azure-script-hub-fa365d79"
+github_owner    = "dspitech"
+
+# GitHub PAT (scope repo + workflow), utilisé une seule fois au boot de la VM
+# pour enregistrer le runner auto-hébergé. A fournir de préférence via :
+#   export TF_VAR_github_pat="ghp_xxxxxxxxxxxx"
+github_pat = "CHANGE-ME"
+
+# ----------------------------
+# Supabase (SECRETS — à ne jamais committer avec de vraies valeurs)
+# Astuce : définissez-les plutôt via variables d'environnement :
+#   export TF_VAR_supabase_url="https://xxxx.supabase.co"
+#   export TF_VAR_supabase_anon_key="sb_publishable_xxx"
+#   export TF_VAR_database_url="postgresql://postgres:xxx@db.xxxx.supabase.co:5432/postgres"
+# ----------------------------
+supabase_url      = "https://CHANGE-ME.supabase.co"
+supabase_anon_key = "CHANGE-ME"
+database_url      = "postgresql://postgres:CHANGE-ME@db.CHANGE-ME.supabase.co:5432/postgres"
+
+# ----------------------------
+# Supervision (Grafana admin password — SECRET)
+#   export TF_VAR_grafana_admin_password="un-mot-de-passe-fort"
+# ----------------------------
+grafana_admin_user     = "admin"
+grafana_admin_password = "CHANGE-ME"
+grafana_allowed_source = "10.0.0.0/16" # ajoutez votre IP publique en /32 si besoin d'accès direct
+
+# ----------------------------
+# Tags
+# ----------------------------
+tags = {
+  Project     = "Deployment-Script-Tools"
+  Environment = "Production"
+  ManagedBy   = "Terraform"
+  Author      = "PLG-Groupe24-ESTIAM-2026"
+}
