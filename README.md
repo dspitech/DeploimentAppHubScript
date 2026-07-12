@@ -322,7 +322,8 @@ azure-script-hub/
 
 
 
-| **Stack** | Terraform · Azure (VNet, Firewall, Bastion, Load Balancer, VM) · Node.js · Nginx · PM2 · Docker · Prometheus · Grafana · GitHub Actions |
+| Stack | Terraform · Azure (VNet, Firewall, Bastion, Load Balancer, VM) · Node.js · Nginx · PM2 · Docker · Prometheus · Grafana · GitHub Actions |
+|-------|---------------------------------------------------------------------------------------------------------------------------------------|
 
 ---
 
@@ -373,41 +374,8 @@ répondant à trois exigences :
 
 ### 1. Vue d'ensemble de l'architecture
 
-```mermaid
-flowchart TB
-    Internet((Internet))
-    LB[Load Balancer Standard<br/>IP publique]
-    VM1[VM-SPOKE-1<br/>Nginx + PM2 + Node.js]
-    VM2[VM-SPOKE-2<br/>Nginx + PM2 + Node.js]
-    MON[VM-MONITORING<br/>Prometheus + Grafana]
-    FW[Azure Firewall]
-    BAST[Azure Bastion]
-    ADMIN((Administrateur))
-    S1[VnetSpoke1<br/>192.168.0.0/24]
-    S2[VnetSpoke2<br/>172.16.0.0/24]
+<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/31a8e188-de6c-4df6-a3c3-6db6386d16b3" />
 
-    Internet --> LB
-    LB --> VM1
-    LB --> VM2
-    VM1 -. métriques :9100 .-> MON
-    VM2 -. métriques :9100 .-> MON
-    ADMIN -->|HTTPS portail Azure| BAST
-    BAST -.->|SSH interne| VM1
-    BAST -.->|SSH interne| VM2
-    BAST -.->|SSH interne| MON
-
-    subgraph HUB[VnetHub 10.0.0.0/16]
-        LB
-        VM1
-        VM2
-        MON
-        FW
-        BAST
-    end
-
-    S1 <-->|peering + UDR via FW| FW
-    S2 <-->|peering + UDR via FW| FW
-```
 
 **Principes de sécurité structurants** :
 
