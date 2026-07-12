@@ -3468,9 +3468,12 @@ Connexion Grafana :
 
 Connexion aux VMs : portail Azure -> Bastion -> sélectionner
 - `VM-SPOKE-1` : 
+<img width="1801" height="419" alt="image" src="https://github.com/user-attachments/assets/2150b184-7e6c-4d91-a704-73af069a2ca2" />
 
-- `VM-SPOKE-2` : 
+
  
+- Site web
+<img width="1917" height="977" alt="image" src="https://github.com/user-attachments/assets/552877a2-d4fd-4137-aee8-ce0a7d5bc97f" />
 
 
 #### 17.2 Destruction de l'infrastructure après test
