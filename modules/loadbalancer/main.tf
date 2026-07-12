@@ -50,6 +50,10 @@ resource "azurerm_lb_rule" "lb_rule_http" {
   probe_id                       = azurerm_lb_probe.http_probe.id
   enable_floating_ip             = false
   idle_timeout_in_minutes        = 4
+  # Requis par Azure : dès qu'une outbound rule référence la même frontend IP,
+  # les LB rules qui l'utilisent doivent désactiver leur propre SNAT implicite,
+  # pour laisser l'outbound rule gérer seule le SNAT sortant.
+  disable_outbound_snat = true
 }
 
 resource "azurerm_lb_rule" "lb_rule_https" {
@@ -63,6 +67,7 @@ resource "azurerm_lb_rule" "lb_rule_https" {
   probe_id                       = azurerm_lb_probe.http_probe.id
   enable_floating_ip             = false
   idle_timeout_in_minutes        = 4
+  disable_outbound_snat          = true
 }
 
 # ============================================================

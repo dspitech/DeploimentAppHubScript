@@ -96,6 +96,10 @@ resource "azurerm_subnet" "spoke2_prod" {
 # ============================================================
 
 # ----- Peerings Hub <-> Spokes -----
+# depends_on explicite : évite l'erreur "ReferencedResourceNotProvisioned /
+# VnetHub not in Succeeded state" quand Terraform tente de créer un peering
+# pendant que d'autres opérations (subnets, associations) modifient encore
+# VnetHub en parallèle.
 resource "azurerm_virtual_network_peering" "hub_to_spoke1" {
   name                         = "HubToSpoke1"
   resource_group_name          = var.rg_name
@@ -103,6 +107,15 @@ resource "azurerm_virtual_network_peering" "hub_to_spoke1" {
   remote_virtual_network_id    = azurerm_virtual_network.spoke1.id
   allow_forwarded_traffic      = true
   allow_virtual_network_access = true
+
+  depends_on = [
+    azurerm_subnet.firewall_subnet,
+    azurerm_subnet.bastion_subnet,
+    azurerm_subnet.hub_prod,
+    azurerm_subnet.hub_vm1,
+    azurerm_subnet.hub_vm2,
+    azurerm_subnet.hub_monitoring,
+  ]
 }
 
 resource "azurerm_virtual_network_peering" "spoke1_to_hub" {
@@ -112,6 +125,8 @@ resource "azurerm_virtual_network_peering" "spoke1_to_hub" {
   remote_virtual_network_id    = azurerm_virtual_network.hub.id
   allow_forwarded_traffic      = true
   allow_virtual_network_access = true
+
+  depends_on = [azurerm_virtual_network_peering.hub_to_spoke1]
 }
 
 resource "azurerm_virtual_network_peering" "hub_to_spoke2" {
@@ -121,6 +136,16 @@ resource "azurerm_virtual_network_peering" "hub_to_spoke2" {
   remote_virtual_network_id    = azurerm_virtual_network.spoke2.id
   allow_forwarded_traffic      = true
   allow_virtual_network_access = true
+
+  depends_on = [
+    azurerm_subnet.firewall_subnet,
+    azurerm_subnet.bastion_subnet,
+    azurerm_subnet.hub_prod,
+    azurerm_subnet.hub_vm1,
+    azurerm_subnet.hub_vm2,
+    azurerm_subnet.hub_monitoring,
+    azurerm_virtual_network_peering.hub_to_spoke1,
+  ]
 }
 
 resource "azurerm_virtual_network_peering" "spoke2_to_hub" {
@@ -130,4 +155,6 @@ resource "azurerm_virtual_network_peering" "spoke2_to_hub" {
   remote_virtual_network_id    = azurerm_virtual_network.hub.id
   allow_forwarded_traffic      = true
   allow_virtual_network_access = true
+
+  depends_on = [azurerm_virtual_network_peering.hub_to_spoke2]
 }
