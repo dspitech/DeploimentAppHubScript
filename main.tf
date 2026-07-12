@@ -272,6 +272,7 @@ module "vm_spoke1" {
   ssh_public_key_path = var.ssh_public_key_path
   vm_image            = var.vm_image
   custom_data_base64  = base64encode(local.app_cloud_init_vm1)
+  attach_to_lb        = true
   backend_pool_id     = module.loadbalancer.backend_pool_id
 }
 
@@ -291,6 +292,7 @@ module "vm_spoke2" {
   ssh_public_key_path = var.ssh_public_key_path
   vm_image            = var.vm_image
   custom_data_base64  = base64encode(local.app_cloud_init_vm2)
+  attach_to_lb        = true
   backend_pool_id     = module.loadbalancer.backend_pool_id
 }
 
