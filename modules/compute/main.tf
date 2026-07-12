@@ -17,7 +17,7 @@ resource "azurerm_network_interface" "this" {
 }
 
 resource "azurerm_network_interface_backend_address_pool_association" "this" {
-  count                   = var.backend_pool_id != null ? 1 : 0
+  count                   = var.attach_to_lb ? 1 : 0
   network_interface_id    = azurerm_network_interface.this.id
   ip_configuration_name   = "internal"
   backend_address_pool_id = var.backend_pool_id
