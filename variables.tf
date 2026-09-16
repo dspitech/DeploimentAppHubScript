@@ -239,6 +239,48 @@ variable "database_url" {
 }
 
 # ----------------------------
+# Supabase — accès lecture seule pour la datasource PostgreSQL de Grafana
+# (distinct de database_url, utilisé par l'appli avec des droits complets).
+# Ces valeurs se trouvent dans Supabase > Project Settings > Database.
+# Il est fortement recommandé de créer un rôle Postgres dédié en lecture
+# seule (voir README) plutôt que de réutiliser l'utilisateur applicatif.
+# ----------------------------
+variable "supabase_db_host" {
+  description = "Hôte PostgreSQL Supabase (ex: aws-0-eu-west-3.pooler.supabase.com pour le connection pooler, recommandé pour Grafana)"
+  type        = string
+}
+
+variable "supabase_db_port" {
+  description = "Port PostgreSQL Supabase (6543 = pooler transaction mode recommandé, 5432 = connexion directe)"
+  type        = string
+  default     = "6543"
+}
+
+variable "supabase_db_name" {
+  description = "Nom de la base PostgreSQL Supabase"
+  type        = string
+  default     = "postgres"
+}
+
+variable "supabase_db_user" {
+  description = "Utilisateur PostgreSQL utilisé par Grafana (idéalement un rôle en lecture seule dédié, ex: grafana_reader)"
+  type        = string
+}
+
+variable "supabase_db_password" {
+  description = "Mot de passe du rôle PostgreSQL utilisé par Grafana (via TF_VAR_supabase_db_password, jamais en dur)"
+  type        = string
+  sensitive   = true
+}
+
+variable "grafana_alert_webhook_url" {
+  description = "URL de webhook (Slack/Discord/Teams/générique) pour les notifications d'alertes Grafana. Laisser vide pour désactiver l'envoi (les alertes restent visibles dans l'UI Grafana)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# ----------------------------
 # CI/CD — GitHub Actions self-hosted runner
 # Les VMs n'ayant pas d'IP publique SSH exposée (accès uniquement via Bastion),
 # le déploiement continu se fait via un runner auto-hébergé qui va chercher

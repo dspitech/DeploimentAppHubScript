@@ -435,7 +435,9 @@ terraform-azure-hubspoke/
 |   `-- monitoring-node.yaml.tpl   Provisioning VM-MONITORING
 |
 |-- monitoring/
-|   `-- grafana/dashboards/hub-spoke-overview.json   Dashboard de référence
+|   `-- grafana/dashboards/
+|       |-- hub-spoke-overview.json          Dashboard infra (Prometheus)
+|       `-- apphub-business-overview.json    Dashboard métier (base Supabase, section 12.2)
 |
 `-- github-actions-for-app-repo/   A copier dans le dépôt de l'application
     |-- .github/workflows/deploy.yml
@@ -739,6 +741,45 @@ variable "supabase_anon_key" {
 variable "database_url" {
   description = "Chaîne de connexion PostgreSQL Supabase (postgresql://...)"
   type        = string
+  sensitive   = true
+}
+
+# ----------------------------
+# Supabase -accès lecture seule pour la datasource PostgreSQL de Grafana
+# (distinct de database_url, voir section 12.2)
+# ----------------------------
+variable "supabase_db_host" {
+  description = "Hôte PostgreSQL Supabase (pooler recommandé pour Grafana)"
+  type        = string
+}
+
+variable "supabase_db_port" {
+  description = "Port PostgreSQL Supabase (6543 = pooler, 5432 = direct)"
+  type        = string
+  default     = "6543"
+}
+
+variable "supabase_db_name" {
+  description = "Nom de la base PostgreSQL Supabase"
+  type        = string
+  default     = "postgres"
+}
+
+variable "supabase_db_user" {
+  description = "Utilisateur PostgreSQL de Grafana (rôle lecture seule dédié, ex: grafana_reader)"
+  type        = string
+}
+
+variable "supabase_db_password" {
+  description = "Mot de passe du rôle PostgreSQL de Grafana (via TF_VAR_supabase_db_password)"
+  type        = string
+  sensitive   = true
+}
+
+variable "grafana_alert_webhook_url" {
+  description = "URL de webhook (Slack/Discord/Teams/générique) pour les notifications d'alertes Grafana -voir section 12.3"
+  type        = string
+  default     = ""
   sensitive   = true
 }
 
@@ -1092,6 +1133,12 @@ locals {
     grafana_admin_password = var.grafana_admin_password
     vm1_ip                 = module.vm_spoke1.private_ip
     vm2_ip                 = module.vm_spoke2.private_ip
+    supabase_db_host       = var.supabase_db_host
+    supabase_db_port       = var.supabase_db_port
+    supabase_db_name       = var.supabase_db_name
+    supabase_db_user       = var.supabase_db_user
+    supabase_db_password   = var.supabase_db_password
+    grafana_alert_webhook_url = var.grafana_alert_webhook_url
   })
 }
 
@@ -2809,10 +2856,30 @@ write_files:
       datasources:
         - name: Prometheus
           type: prometheus
+          uid: prometheus
           access: proxy
           url: http://prometheus:9090
           isDefault: true
           editable: false
+
+        # Base de données du site (Supabase PostgreSQL) -voir section 12.2
+        - name: Supabase PostgreSQL
+          type: postgres
+          uid: supabase-postgres
+          access: proxy
+          url: "${supabase_db_host}:${supabase_db_port}"
+          database: "${supabase_db_name}"
+          user: "${supabase_db_user}"
+          editable: false
+          jsonData:
+            sslmode: require
+            postgresVersion: 1500
+            timescaledb: false
+            maxOpenConns: 5
+            maxIdleConns: 2
+            connMaxLifetime: 14400
+          secureJsonData:
+            password: "${supabase_db_password}"
 
   - path: /opt/monitoring/grafana/provisioning/dashboards/dashboards.yml
     owner: root:root
@@ -2820,9 +2887,9 @@ write_files:
     content: |
       apiVersion: 1
       providers:
-        - name: "Infrastructure"
+        - name: "PLG AppHub - Groupe 24"
           orgId: 1
-          folder: "Infrastructure"
+          folder: "PLG AppHub - Groupe 24"
           type: file
           disableDeletion: false
           updateIntervalSeconds: 30
@@ -2929,6 +2996,15 @@ write_files:
           }
         ]
       }
+
+  - path: /opt/monitoring/grafana/dashboards/apphub-business-overview.json
+    owner: root:root
+    permissions: '0644'
+    content: |
+      # 21 panels interrogeant la base PostgreSQL Supabase du site en SQL
+      # (scripts, catégories, utilisateurs, invités, messages de contact,
+      # audit_logs, likes/partages) -voir le détail complet en section 12.2
+      # et le fichier monitoring/grafana/dashboards/apphub-business-overview.json.
 
 runcmd:
   # --- Docker ---
@@ -3108,13 +3184,143 @@ chargé automatiquement grâce au provider défini dans `dashboards.yml`
 (section 11.2) -le dashboard est donc visible **dès la première connexion**
 à Grafana, sans étape manuelle "Import dashboard" à réaliser après coup.
 
+#### 12.2 `monitoring/grafana/dashboards/apphub-business-overview.json` -dashboard métier (base de données du site)
+
+En plus du dashboard infrastructure (métriques serveur via Prometheus),
+Grafana est désormais connecté **directement à la base PostgreSQL Supabase
+du site** via une datasource `postgres` provisionnée dans
+`datasources/datasource.yml` (section 11.2), au même titre que Prometheus.
+Elle interroge les vraies tables de l'application (`scripts`, `categories`,
+`profiles`, `guest_users`, `contact_messages`, `audit_logs`,
+`script_likes`, `script_shares`) via SQL et affiche un dashboard de 21
+panels, organisé en 4 sections :
+
+| Section | Panels | Exemple de requête SQL |
+|---|---|---|
+| Indicateurs clés | Scripts actifs, utilisateurs inscrits, invités, messages (7j) | `SELECT count(*) FROM public.scripts WHERE status = 'active'` |
+| Contenu -Scripts | Répartition par statut/catégorie/criticité, nouveaux scripts/jour, top 10 les plus consultés | `SELECT $__timeGroup(created_at,'1d') AS time, count(*) FROM public.scripts WHERE $__timeFilter(created_at) GROUP BY 1` |
+| Utilisateurs et invités | Nouveaux comptes/jour, nouveaux invités/jour | idem avec `public.profiles` / `public.guest_users` |
+| Contact et sécurité | Messages par catégorie/statut, activité d'audit par heure, derniers messages, top actions d'audit, top scripts likés/partagés | `SELECT action, resource, count(*) FROM public.audit_logs WHERE $__timeFilter(created_at) GROUP BY action, resource` |
+| Ressources documentaires | Répartition par type/statut, top 10 ressources les plus téléchargées | `SELECT resource_type::text AS "Type", count(*) FROM public.resources GROUP BY resource_type` |
+| Corbeille (suppressions) | Suppressions par jour, par type d'élément, derniers éléments supprimés (qui, quoi, pourquoi) | `SELECT resource_type, count(*) FROM public.trash_items GROUP BY resource_type` |
+
+Le dashboard compte **29 panels** au total (6 rows).
+
+Les macros `$__timeFilter()` et `$__timeGroup()` branchent les requêtes SQL
+sur le sélecteur de plage temporelle de Grafana (par défaut `now-30d` ->
+`now`), exactement comme le ferait une requête PromQL sur le dashboard
+infrastructure.
+
+**Pourquoi une datasource `postgres` dédiée plutôt que de réutiliser
+`database_url`** : `database_url` (utilisée par l'application, voir
+section 11.1) donne des droits complets sur la base, y compris en écriture
+et sur des tables sensibles (`profiles`, `user_roles`, `audit_logs`...).
+Exposer ces identifiants à Grafana -même protégé par mot de passe et NSG-
+serait une mauvaise pratique de sécurité. La bonne pratique consiste à
+créer dans Supabase un **rôle PostgreSQL dédié, en lecture seule**, limité
+aux tables réellement utilisées par le dashboard, et à l'utiliser pour les
+variables `supabase_db_user` / `supabase_db_password` :
+
+```sql
+-- À exécuter une seule fois dans Supabase (SQL Editor), avec le rôle postgres
+CREATE ROLE grafana_reader WITH LOGIN PASSWORD 'un-mot-de-passe-fort';
+
+GRANT USAGE ON SCHEMA public TO grafana_reader;
+
+GRANT SELECT ON
+  public.scripts,
+  public.categories,
+  public.profiles,
+  public.guest_users,
+  public.contact_messages,
+  public.audit_logs,
+  public.script_likes,
+  public.script_shares
+TO grafana_reader;
+
+-- Optionnel : que les nouvelles tables futures restent invisibles par défaut
+-- (pas de ALTER DEFAULT PRIVILEGES -> accès explicite table par table)
+```
+
+Le mot de passe de ce rôle est ensuite fourni via
+`TF_VAR_supabase_db_password` (jamais commité), exactement comme
+`grafana_admin_password` ou `github_pat` (voir section 16).
+
+**Pourquoi le connection pooler (port 6543) plutôt que la connexion directe
+(5432)** : Supabase limite le nombre de connexions directes concurrentes à
+la base ; passer par le pooler (mode transaction) évite que Grafana
+n'entre en compétition avec l'application (VM1/VM2) pour ces connexions,
+d'autant que `jsonData.maxOpenConns: 5` limite volontairement le pool côté
+Grafana.
+
+**Aucune ouverture réseau supplémentaire nécessaire** : le NSG
+`nsg_monitoring` (section 6) ne définit que des règles **entrantes** ; le
+trafic **sortant** de la VM de supervision vers Supabase (HTTPS/Postgres)
+passe par les règles de sortie par défaut d'Azure, déjà autorisées.
+
+#### 12.3 Alertes Grafana (`provisioning/alerting/*.yaml`)
+
+Trois règles d'alerte sont provisionnées automatiquement (fichiers dans
+`cloud-init/monitoring-node.yaml.tpl`, sans étape manuelle dans l'UI
+Grafana), toutes évaluées toutes les 5 minutes sur la datasource
+`Supabase PostgreSQL` :
+
+| Alerte | Condition | Sévérité | Pourquoi |
+|---|---|---|---|
+| **Pic de messages de contact** | > 20 messages reçus sur la dernière heure | `warning` | Détecte un abus/spam du formulaire de contact public |
+| **Suppression massive détectée** | > 10 éléments (`scripts`/`resources`/`categories`) envoyés en corbeille (`trash_items`) sur la dernière heure | `critical` | Détecte une suppression accidentelle ou malveillante en masse, à corréler avec les `audit_logs` et la table `trash_items` (restauration possible via son `payload`) |
+| **Pic d'activité d'audit** | > 150 événements dans `audit_logs` sur les 15 dernières minutes | `warning` | Détecte un volume d'actions inhabituel (abus, compte compromis, script en boucle) |
+
+Chaque règle exécute une requête SQL (`data.refId: A`) puis une expression
+de seuil serveur (`refId: C`, datasource spéciale `-100` = *Expression*
+interne à Grafana) -aucune logique n'est déportée côté application.
+
+**Notification** : les alertes envoient une notification via un
+**contact point webhook** (`apphub-webhook`), compatible avec une URL
+Slack "Incoming Webhook", Discord, Microsoft Teams, ou tout endpoint HTTP
+générique (n8n, Make, etc.). Elle se configure avec la variable
+`grafana_alert_webhook_url` :
+
+```bash
+# Exemple avec un webhook entrant Slack
+export TF_VAR_grafana_alert_webhook_url="https://hooks.slack.com/services/XXX/YYY/ZZZ"
+```
+
+Si cette variable est laissée vide (valeur par défaut), les règles
+**restent actives et visibles** dans Grafana -> Alerting -> Alert rules
+(avec leur état `Normal`/`Pending`/`Firing`), seule l'notification externe
+est absente. Aucune configuration SMTP n'est requise : c'est volontaire,
+pour ne pas dépendre d'un relais mail supplémentaire dans l'infra. Ajouter
+un contact point `email` reste possible en complétant les variables
+`GF_SMTP_*` du service `grafana` dans le `docker-compose.yml` généré
+(section 11.2) si un relais SMTP est disponible.
+
 ---
 ### 13. CI/CD : pipeline GitHub Actions
 
-Ces deux fichiers ne vivent pas dans ce dépôt Terraform : ils sont préparés
-dans `github-actions-for-app-repo/` pour être **copiés dans le dépôt de
+Ces fichiers ne vivent pas dans ce dépôt Terraform : ils sont préparés dans
+`github-actions-for-app-repo/` pour être **copiés dans le dépôt de
 l'application** (`plg-projet-pedagogique-2026-groupe-24`), puisque c'est ce
 dépôt qui doit déclencher le déploiement à chaque `push`.
+
+**Vue d'ensemble du pipeline** (4 jobs) :
+
+```
+push sur main
+     │
+     ▼
+  quality ──────────────► lint (ESLint) + tests (Vitest)
+     │                    sur runner GitHub-hosted, AVANT tout déploiement
+     ▼
+ deploy-vm1 ─────────────► build + rsync + pm2 reload + health check
+     │                     rollback auto si le health check échoue
+     ▼ (seulement si vm1 a réussi)
+ deploy-vm2 ─────────────► idem sur VM-SPOKE-2
+     │
+     ▼
+ smoke-test ─────────────► vérifie le site via l'IP publique du Load Balancer
+                            + notification webhook (succès/échec)
+```
 
 #### 13.1 `.github/workflows/deploy.yml`
 
@@ -3122,17 +3328,28 @@ dépôt qui doit déclencher le déploiement à chaque `push`.
 # ============================================================
 # PLG - 2026 / Groupe 24 : ESTIAM - Paris
 # .github/workflows/deploy.yml
-# À copier dans le dépôt de l'application (plg-projet-pedagogique-2026-groupe-24)
+# À copier dans le dépôt de l'application (azure-script-hub-fa365d79)
 #
 # Fonctionnement :
 # - Déclenché à chaque push sur "main"
+# - "quality" tourne sur un runner GitHub-hosted (ubuntu-latest) : lint +
+#   tests, AVANT tout déploiement -aucun code cassé n'atteint la prod.
 # - Les deux VMs (VM-SPOKE-1 / VM-SPOKE-2) exécutent chacune un runner
 #   GitHub Actions auto-hébergé (installé par cloud-init), identifié
 #   par le label "vm-spoke-1" / "vm-spoke-2"
 # - Aucune ouverture de port SSH entrant n'est nécessaire : le runner
 #   va chercher le travail sur GitHub (connexion sortante uniquement)
-# - Le déploiement se fait un noeud après l'autre (rolling deploy) pour
-#   garder le site disponible via le Load Balancer pendant la mise à jour
+# - Le déploiement se fait un noeud après l'autre (rolling deploy) : si
+#   VM1 échoue (build cassé, health check KO), VM2 n'est jamais touché
+#   et continue de servir la version précédente -zéro downtime.
+# - scripts/deploy.sh sauvegarde le build précédent et revient dessus
+#   automatiquement si le nouveau déploiement échoue son health check.
+# - "smoke-test" vérifie enfin, depuis l'extérieur, que le site répond
+#   bien via le Load Balancer public (les deux VMs confondues).
+#
+# À configurer dans Settings > Secrets and variables > Actions :
+#   Variables : PROD_URL = http://<load_balancer_public_ip>   (terraform output load_balancer_public_ip)
+#   Secrets   : DEPLOY_WEBHOOK_URL = URL webhook Slack/Discord/Teams (optionnel, notif succès/échec)
 # ============================================================
 
 name: Deploy Web App
@@ -3147,53 +3364,172 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy-vm1:
-    name: Déploiement VM-SPOKE-1
-    runs-on: [self-hosted, vm-spoke-1]
+  quality:
+    name: Lint & tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Déployer l'application
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Installer les dépendances
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Tests unitaires (Vitest)
+        run: npm test
+
+  deploy-vm1:
+    name: Déploiement VM-SPOKE-1
+    needs: quality
+    runs-on: [self-hosted, vm-spoke-1]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Déployer l'application (avec sauvegarde + rollback auto)
         run: bash scripts/deploy.sh
 
-      - name: Vérifier la santé locale (nginx / health)
+      - name: Vérifier la santé locale (backend Node direct, sans passer par Nginx)
+        run: curl -f http://localhost:3000
+
+      - name: Vérifier la santé locale (via Nginx)
         run: curl -f http://localhost/health
+
+      - name: Notifier en cas d'échec
+        if: failure()
+        env:
+          WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "Aucun DEPLOY_WEBHOOK_URL configuré, notification ignorée."
+            exit 0
+          fi
+          curl -sf -X POST -H "Content-Type: application/json" \
+            -d "{\"text\":\"❌ Déploiement VM-SPOKE-1 échoué -commit ${GITHUB_SHA::7}, rollback automatique effectué. Voir $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}" \
+            "$WEBHOOK_URL" || true
 
   deploy-vm2:
     name: Déploiement VM-SPOKE-2
     needs: deploy-vm1
     runs-on: [self-hosted, vm-spoke-2]
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Déployer l'application
+      - name: Déployer l'application (avec sauvegarde + rollback auto)
         run: bash scripts/deploy.sh
 
-      - name: Vérifier la santé locale (nginx / health)
+      - name: Vérifier la santé locale (backend Node direct, sans passer par Nginx)
+        run: curl -f http://localhost:3000
+
+      - name: Vérifier la santé locale (via Nginx)
         run: curl -f http://localhost/health
+
+      - name: Notifier en cas d'échec
+        if: failure()
+        env:
+          WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "Aucun DEPLOY_WEBHOOK_URL configuré, notification ignorée."
+            exit 0
+          fi
+          curl -sf -X POST -H "Content-Type: application/json" \
+            -d "{\"text\":\"❌ Déploiement VM-SPOKE-2 échoué -commit ${GITHUB_SHA::7}, rollback automatique effectué. VM-SPOKE-1 reste à jour, site toujours disponible. Voir $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}" \
+            "$WEBHOOK_URL" || true
+
+  smoke-test:
+    name: Vérification bout-en-bout (Load Balancer public)
+    needs: [deploy-vm1, deploy-vm2]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Vérifier que le site répond via le Load Balancer
+        env:
+          PROD_URL: ${{ vars.PROD_URL }}
+        run: |
+          if [ -z "$PROD_URL" ]; then
+            echo "Variable de dépôt PROD_URL non configurée, smoke-test ignoré."
+            exit 0
+          fi
+          for i in 1 2 3 4 5; do
+            if curl -fsS "$PROD_URL/health"; then
+              echo "==> Site OK via Load Balancer"
+              exit 0
+            fi
+            echo "Tentative $i/5 échouée, nouvelle tentative dans 5s..."
+            sleep 5
+          done
+          echo "::error::Le site ne répond pas via le Load Balancer après déploiement"
+          exit 1
+
+      - name: Notifier le succès
+        if: success()
+        env:
+          WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            exit 0
+          fi
+          curl -sf -X POST -H "Content-Type: application/json" \
+            -d "{\"text\":\"✅ Déploiement réussi sur VM-SPOKE-1 et VM-SPOKE-2 -commit ${GITHUB_SHA::7}\"}" \
+            "$WEBHOOK_URL" || true
 ```
 
 **Explication** :
+- **`quality`** (nouveau) : tourne sur un runner **GitHub-hosted**
+  (`ubuntu-latest`), donc jamais sur l'infra Azure -exécute `npm run lint`
+  et `npm test` (scripts déjà présents dans `package.json` mais jusque-là
+  jamais appelés en CI). Les deux jobs de déploiement ont `needs: quality` :
+  **aucun code qui échoue au lint ou aux tests n'atteint la production**.
 - `on: push: branches: [main]` : déclenche le workflow à chaque push sur
   `main` (et manuellement via `workflow_dispatch` si besoin de rejouer un
   déploiement sans nouveau commit).
 - `concurrency` : empêche deux déploiements de tourner en même temps si
   plusieurs push arrivent rapprochés (le second attend la fin du premier).
-- Deux jobs, `deploy-vm1` et `deploy-vm2`, chacun ciblé sur un runner précis
-  via ses labels (`[self-hosted, vm-spoke-1]` / `[self-hosted, vm-spoke-2]`)
+- `deploy-vm1` et `deploy-vm2` sont ciblés chacun sur un runner précis via
+  ses labels (`[self-hosted, vm-spoke-1]` / `[self-hosted, vm-spoke-2]`)
   -ce sont exactement les labels enregistrés par le cloud-init (section 11.1).
-- `deploy-vm2` a `needs: deploy-vm1` : **VM2 n'est mise à jour que si VM1 a
-  réussi**, avec vérification `curl -f http://localhost/health` avant de
-  passer à la suite.
+  `deploy-vm2` a `needs: deploy-vm1` : **VM2 n'est mise à jour que si VM1 a
+  réussi**.
+- **Double vérification de santé** sur chaque VM : `curl -f http://localhost:3000`
+  interroge **directement le backend Node** (bypass Nginx), et
+  `curl -f http://localhost/health` vérifie Nginx. La première est celle qui
+  compte vraiment : l'ancien `/health` de Nginx répondait `200 OK` en statique,
+  **sans jamais interroger le process Node/PM2** -un déploiement qui casse le
+  build aurait pu passer ce check sans être détecté.
+- **`timeout-minutes`** sur chaque job : évite qu'un job bloqué (ex : `npm
+  install` qui ne répond plus) ne bloque indéfiniment le pipeline et les
+  runners.
+- **`smoke-test`** (nouveau) : job final sur `ubuntu-latest`, qui vérifie le
+  site **de l'extérieur**, via l'IP publique du Load Balancer
+  (`terraform output load_balancer_public_ip`, à renseigner une fois dans la
+  variable de dépôt `PROD_URL`) -c'est la seule vérification qui valide
+  réellement que le Load Balancer route bien le trafic vers les deux VMs à
+  jour, avec 5 tentatives espacées de 5 secondes.
+- **Notifications** (optionnelles) : si le secret `DEPLOY_WEBHOOK_URL` est
+  configuré (webhook Slack/Discord/Teams), un message est envoyé en cas
+  d'échec de déploiement ou de succès du smoke-test. Volontairement un
+  **secret** (et non une variable) car une URL de webhook doit rester
+  confidentielle (n'importe qui la connaissant peut poster dedans).
 
 **Pourquoi un déploiement séquentiel (rolling deploy) plutôt que simultané**
 : si les deux VMs étaient mises à jour en même temps et que le nouveau code
 contient un bug bloquant, le site entier tomberait. En séquentiel, VM2 reste
 disponible pendant la mise à jour de VM1 (et inversement), et si VM1 échoue
-sa vérification `/health`, VM2 n'est jamais touchée -le site reste
-disponible sur l'ancienne version.
+son health check, VM2 n'est jamais touchée -le site reste disponible sur
+l'ancienne version.
 
 ---
 
@@ -3204,14 +3540,25 @@ disponible sur l'ancienne version.
 # ============================================================
 # PLG - 2026 / Groupe 24 : ESTIAM - Paris
 # scripts/deploy.sh
-# À copier dans le dépôt de l'application (plg-projet-pedagogique-2026-groupe-24)
+# À copier dans le dépôt de l'application (azure-script-hub-fa365d79)
 # Exécuté par le runner GitHub Actions auto-hébergé sur chaque VM.
+#
+# Sécurité du déploiement :
+# - le build précédent est sauvegardé avant d'être remplacé
+# - après redémarrage de pm2, on vérifie que l'appli répond vraiment
+#   (plusieurs tentatives, avec délai)
+# - si la vérification échoue, le build précédent est restauré et pm2
+#   est rechargé dessus automatiquement -le site continue de servir
+#   la dernière version qui fonctionnait, sans intervention manuelle.
 # ============================================================
 set -euo pipefail
 
 REPO_NAME="$(basename "$(git rev-parse --show-toplevel)")"
 APP_DIR="$HOME/projects/$REPO_NAME"
 ENV_FILE="$HOME/projects/app.env"
+HEALTH_URL="http://localhost:3000"
+HEALTH_RETRIES=6
+HEALTH_DELAY=5
 
 echo "==> Déploiement de $REPO_NAME vers $APP_DIR"
 
@@ -3228,6 +3575,14 @@ npm ci --legacy-peer-deps
 npm run build
 
 mkdir -p "$APP_DIR"
+
+# --- Sauvegarde du build actuellement servi, pour rollback si besoin ---
+if [ -d "$APP_DIR/dist" ]; then
+  rm -rf "$APP_DIR/dist_previous"
+  mv "$APP_DIR/dist" "$APP_DIR/dist_previous"
+  echo "==> Build précédent sauvegardé dans $APP_DIR/dist_previous"
+fi
+
 rsync -a --delete dist/ "$APP_DIR/dist/"
 
 cd "$APP_DIR"
@@ -3241,6 +3596,32 @@ fi
 
 pm2 save
 
+# --- Vérification que la nouvelle version répond réellement ---
+echo "==> Vérification de la santé de l'application ($HEALTH_URL)..."
+ok=false
+for i in $(seq 1 "$HEALTH_RETRIES"); do
+  if curl -fsS "$HEALTH_URL" -o /dev/null; then
+    ok=true
+    break
+  fi
+  echo "   Tentative $i/$HEALTH_RETRIES échouée, nouvel essai dans ${HEALTH_DELAY}s..."
+  sleep "$HEALTH_DELAY"
+done
+
+if [ "$ok" = false ]; then
+  echo "!! L'application ne répond pas après déploiement -ROLLBACK automatique."
+  if [ -d "$APP_DIR/dist_previous" ]; then
+    rm -rf "$APP_DIR/dist"
+    mv "$APP_DIR/dist_previous" "$APP_DIR/dist"
+    pm2 reload webapp || pm2 start "$(which serve)" --name "webapp" -- -s dist -l 3000
+    pm2 save
+    echo "==> Rollback effectué : le build précédent est de nouveau servi."
+  else
+    echo "!! Aucun build précédent disponible pour un rollback (premier déploiement)."
+  fi
+  exit 1
+fi
+
 echo "==> Déploiement terminé avec succès."
 ```
 
@@ -3253,12 +3634,22 @@ echo "==> Déploiement terminé avec succès."
 - `npm ci` (plutôt que `npm install`) : installe exactement les versions du
   `package-lock.json`, garantissant un build reproductible et plus rapide
   en CI.
-- `rsync -a --delete` : synchronise le dossier `dist/` du build vers le
-  dossier réellement servi par PM2, en supprimant les anciens fichiers qui
-  n'existent plus dans le nouveau build.
+- **Sauvegarde avant remplacement** (nouveau) : le dossier `dist/` actuellement
+  servi est renommé en `dist_previous/` **avant** que `rsync --delete` ne le
+  remplace par le nouveau build. Auparavant, `rsync --delete` écrasait
+  directement l'ancien build -aucun retour en arrière n'était possible en
+  cas de problème après coup.
 - `pm2 reload webapp` (plutôt que `pm2 restart`) : `reload` redémarre
   l'application **sans temps d'arrêt** (zero-downtime reload), alors que
   `restart` couperait brièvement le service.
+- **Vérification + rollback automatique** (nouveau) : après le `pm2 reload`,
+  le script attend que `http://localhost:3000` réponde (jusqu'à 6 tentatives,
+  5 secondes d'écart -le temps qu'un `serve`/PM2 fraîchement rechargé se
+  stabilise). Si ça échoue, `dist_previous/` est restauré et PM2 est
+  rechargé dessus **automatiquement, sans intervention manuelle** : le site
+  continue de servir la dernière version qui fonctionnait, et le job GitHub
+  Actions se termine en échec (`exit 1`) -ce qui empêche `deploy-vm2` de
+  démarrer (`needs: deploy-vm1`).
 
 **Pourquoi ce script est séparé du workflow YAML** : le garder dans un
 fichier `.sh` dédié permet de le tester manuellement en SSH (via Bastion)
@@ -3268,7 +3659,47 @@ déploiement.
 
 ---
 
-#### 13.3 Dépannage : vérifier et relancer le runner auto-hébergé
+#### 13.3 Configuration à faire une seule fois côté GitHub
+
+Dans le dépôt de l'application, **Settings -> Secrets and variables ->
+Actions** :
+
+| Type | Nom | Valeur | Obligatoire |
+|---|---|---|---|
+| Variable | `PROD_URL` | `http://<load_balancer_public_ip>` (sortie Terraform `load_balancer_public_ip`) | Non -sans elle, `smoke-test` réussit automatiquement sans vérifier (comportement dégradé mais non bloquant) |
+| Secret | `DEPLOY_WEBHOOK_URL` | URL de webhook entrant Slack/Discord/Teams/n8n | Non -sans lui, simplement pas de notification |
+
+Aucune des deux n'est requise pour que le pipeline fonctionne : elles ne
+font qu'ajouter une vérification bout-en-bout et des notifications.
+
+---
+
+#### 13.4 Limite connue et piste d'amélioration -scope du token du runner
+
+Le `github_pat` (section 14/15) utilisé pour enregistrer les runners
+auto-hébergés a le scope classique `repo` + `workflow`, plus large que
+nécessaire (l'enregistrement d'un runner ne requiert que la permission
+*Administration* du dépôt). Ce PAT est injecté en clair dans le
+`custom_data` cloud-init de chaque VM, ce qui le rend lisible par :
+- toute identité Azure disposant d'un rôle *Reader* sur le groupe de
+  ressources (le custom_data d'une VM n'est pas un secret Azure) ;
+- toute personne ayant un accès SSH légitime à la VM, via
+  `/var/log/cloud-init-output.log`.
+
+**Pistes d'amélioration** (non implémentées ici, pour rester dans le
+périmètre pédagogique du projet) :
+1. Remplacer le PAT classique par un **PAT fine-grained** limité à la seule
+   permission *Administration: Read and write* sur ce dépôt.
+2. Faire tourner régulièrement (rotation) ce token et le renouveler via
+   `TF_VAR_github_pat` sans le committer.
+3. À terme, remplacer le PAT par un **GitHub App** dédié (token
+   d'installation à courte durée de vie, généré à la demande), qui est
+   l'approche recommandée par GitHub pour l'auto-enregistrement de runners
+   à l'échelle -hors périmètre d'un projet étudiant.
+
+---
+
+#### 13.5 Dépannage : vérifier et relancer le runner auto-hébergé
 
 Le cloud-init (section 11.1) installe et démarre déjà le runner comme
 **service systemd** dès le premier boot de chaque VM (`svc.sh install` +
@@ -3474,7 +3905,10 @@ Ces deux dossiers permettent à chaque nouveau `push` sur `main` déclenche auto
 | 4 | Chaîne de connexion base | variable d'environnement | `TF_VAR_database_url` |
 | 5 | GitHub PAT | variable d'environnement | `TF_VAR_github_pat` |
 | 6 | Mot de passe admin Grafana | variable d'environnement | `TF_VAR_grafana_admin_password` |
-
+| 7 | Hôte PostgreSQL Supabase (datasource Grafana) | `terraform.tfvars` | `supabase_db_host` |
+| 8 | Utilisateur PostgreSQL Grafana (`grafana_reader`, lecture seule — voir 12.2) | `terraform.tfvars` | `supabase_db_user` |
+| 9 | Mot de passe du rôle `grafana_reader` | variable d'environnement | `TF_VAR_supabase_db_password` |
+| 10 | Webhook alertes Grafana (Slack/Discord/Teams, optionnel — voir 12.3) | variable d'environnement | `TF_VAR_grafana_alert_webhook_url` |
 
 ---
 

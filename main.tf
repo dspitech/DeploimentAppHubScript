@@ -302,6 +302,12 @@ locals {
     grafana_admin_password = var.grafana_admin_password
     vm1_ip                 = module.vm_spoke1.private_ip
     vm2_ip                 = module.vm_spoke2.private_ip
+    supabase_db_host       = var.supabase_db_host
+    supabase_db_port       = var.supabase_db_port
+    supabase_db_name       = var.supabase_db_name
+    supabase_db_user       = var.supabase_db_user
+    supabase_db_password   = var.supabase_db_password
+    grafana_alert_webhook_url = var.grafana_alert_webhook_url
   })
 }
 
